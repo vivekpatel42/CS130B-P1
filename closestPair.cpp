@@ -17,9 +17,13 @@ double distance(pair<double, double> firstPair, pair<double, double> secondPair)
 pair<double, double>* brute(vector<pair<double, double>> points, int n);
 pair<double, double>* basic(vector<pair<double, double>> points, int n);
 pair<double, double>* basicHelper(vector<pair<double, double>> points, int n);
-pair<double, double>* minimumStrip(pair<double, double>* strip, int size, double delta);
+pair<double, double>* minimumStripBasic(pair<double, double>* strip, int size, double delta);
 pair<double, double>* optimal(vector<pair<double, double>> points, int n);
+pair<double, double>* optimalHelper(vector<pair<double, double>> pointsX, vector<pair<double, double>> pointsY, int n);
+pair<double, double>* minimumStripOptimal(pair<double, double>* strip, int size, double delta);
 
+// main: reads user input and determines which of the 3 algorithm implementations to run
+// (brute, basic, or optimal)
 int main(int argc, char** argv)
 {
 	vector<pair<double, double>> points;
@@ -60,16 +64,17 @@ int main(int argc, char** argv)
 	}
 }
 
-// Custom comparison function for vector of pairs along the x axis
+// Custom comparison function for sorting a vector of pairs by x-coordinate
 bool pairCompareX(const pair<double, double>& firstElem, const pair<double, double>& secondElem) {
 	return firstElem.first < secondElem.first;
 }
 
-// Custom comparison function for vector of pairs along the y axis
+// Custom comparison function for sorting a vector of pairs by y-coordinate
 bool pairCompareY(const pair<double, double>& firstElem, const pair<double, double>& secondElem) {
 	return firstElem.second < secondElem.second;
 }
 
+// Finds distance between a pair of points in two dimensions
 double distance(pair<double, double> firstPair, pair<double, double> secondPair)
 {
 	return sqrt(pow((firstPair.first - secondPair.first), 2) + pow((firstPair.second - secondPair.second), 2));
@@ -91,6 +96,7 @@ pair<double, double>* brute(vector<pair<double, double>> points, int n)
 	return targetPoints;
 }
 
+// basic and basicHelper are the implementation for the basic divide-and-conquer algorithm
 pair<double, double>* basic(vector<pair<double, double>> points, int n) {
 	pair<double, double>* targetPoints = new pair<double, double>[2];
 	sort(points.begin(), points.end(), pairCompareX);
@@ -137,7 +143,7 @@ pair<double, double>* basicHelper(vector<pair<double, double>> points, int n) {
 		}
 	} 
 
-	stripResult = minimumStrip(strip, index, delta);
+	stripResult = minimumStripBasic(strip, index, delta);
 	double stripDist = distance(stripResult[0], stripResult[1]);
 
 	if (delta <= stripDist) {
@@ -148,8 +154,7 @@ pair<double, double>* basicHelper(vector<pair<double, double>> points, int n) {
 	}
 }
 
-pair<double, double>* minimumStrip(pair<double, double>* strip, int size, double delta)
-{
+pair<double, double>* minimumStripBasic(pair<double, double>* strip, int size, double delta) {
     double minimum = delta;
  	pair<double, double>* result = new pair<double, double>[2];
  	result[0] = make_pair(-DBL_MAX, -DBL_MAX);
@@ -169,6 +174,89 @@ pair<double, double>* minimumStrip(pair<double, double>* strip, int size, double
 }
 
 pair<double, double>* optimal(vector<pair<double, double>> points, int n) {
-	pair<double, double>* targetPoints = new pair<double, double>[2];	
+	pair<double, double>* targetPoints = new pair<double, double>[2];
+	vector<pair<double, double>> pointsX, pointsY;
+	pointsX = pointsY = points;
+	sort(pointsX.begin(), pointsX.end(), pairCompareX);
+	sort(pointsY.begin(), pointsY.end(), pairCompareY);
+	targetPoints = optimalHelper(pointsX, pointsY, points.size());	
 	return targetPoints;
+}
+
+pair<double, double>* optimalHelper(vector<pair<double, double>> pointsX, vector<pair<double, double>> pointsY, int n) {
+	if (n <= 3) {
+        return brute(pointsX, n);
+	}
+    int mid = n/2;
+    pair<double, double> median = pointsX[mid];
+    vector<pair<double, double>> leftY;   
+    vector<pair<double, double>> rightY;  
+    for (int i = 0; i < n; i++)
+    {
+      if (pointsY[i].first <= median.first) {
+         leftY.push_back(pointsY[i]);
+      }
+      else {
+         rightY.push_back(pointsY[i]);
+      }
+    }
+
+   	pair<double, double>* resultRight = new pair<double, double>[2]; 
+	pair<double, double>* resultLeft = new pair<double, double>[2];
+	pair<double, double>* result = new pair<double, double>[2];
+
+    resultRight = optimalHelper(pointsX, rightY, mid);
+    resultLeft = optimalHelper(pointsX, leftY, n - mid);
+
+	double deltaRight = distance(resultRight[0], resultRight[1]);
+	double deltaLeft = distance(resultLeft[0], resultLeft[1]);
+	double delta;
+
+	if (deltaRight <= deltaLeft) {
+		delta = deltaRight;
+		result = resultRight;
+	}
+	else {
+		delta = deltaLeft;
+		result = resultLeft;
+	}
+
+    pair<double, double> strip[n];
+    pair<double, double>* stripResult = new pair<double, double>[2];
+
+    int index = 0;
+    for (int i = 0; i < n; i++) {
+        if (abs(pointsY[i].first - median.first) < delta) {
+            strip[index] = pointsY[i]; 
+			index++;	
+		}
+	} 
+
+	stripResult = minimumStripOptimal(strip, index, delta);
+	double stripDist = distance(stripResult[0], stripResult[1]);
+
+	if (delta <= stripDist) {
+		return result;
+	}
+	else {
+		return stripResult;
+	}
+}
+
+pair<double, double>* minimumStripOptimal(pair<double, double>* strip, int size, double delta) {
+	double minimum = delta;
+	pair<double, double>* result = new pair<double, double>[2];
+	result[0] = make_pair(-DBL_MAX, -DBL_MAX);
+	result[1] = make_pair(DBL_MAX, DBL_MAX);
+	sort(strip, strip + size, pairCompareY); 
+	for (int i = 0; i < size; i++) {
+	    for (int j = i+1; j < size && (strip[j].second - strip[i].second) < minimum; j++) {
+	        if (distance(strip[i],strip[j]) < minimum) {
+	            minimum = distance(strip[i], strip[j]);
+	            result[0] = strip[i];
+	            result[1] = strip[j];
+	    	}
+		}	
+	}
+	return result;
 }
